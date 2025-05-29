@@ -2,26 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş Yap</title>
+    <title>Document</title>
+    <style>
+
+    </style>
 </head>
 <body>
-    <p><label>Ad</label>
-    <input type="text" id="ad"></p>
-
-    <p><label>Soyad</label>
-        <input type="text" id="soyad"></p>
-
-    <button type="button" id="giris" onclick="girisyap()">Giriş Yap</button>
 
 
+    <button onclick="oyun1()">Oyun1</button>
+    <button onclick="oyun2()">Oyun2</button>
     <script>
-        function girisyap(){
-            var ad = document.getElementById(ad).value;
-            var soyad = document.getElementById(soyad).value;
-            
+
+
+        function oyun1(){
+        window.location.href = "ege.html";
+        }
+        function oyun2(){
+        window.location.href = "oyun2.html";
         }
     </script>
 </body>
-</html>
+</html> 
