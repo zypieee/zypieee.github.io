@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Canvas Oyunu</title>
+  <style>
+    canvas {
+      background: #f0f0f0;
+      display: block;
+      margin: 30px auto;
+      border: 2px solid #333;
+    }
+
+    #gameOver {
+      text-align: center;
+      font-size: 24px;
+      display: none;
+    }
+
+    #restartBtn {
+      display: none;
+      margin: 10px auto;
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<div id="gameOver">🎮 Oyun Bitti! <br> Skor: <span id="finalScore">0</span></div>
+<button id="restartBtn" onclick="restartGame()">↻ Yeniden Başlat</button>
+
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const hedef = { x: 150, y: 50, w: 40, h: 40, dx: 3 };
+  const kareSol = { x: 100, y: 550, w: 40, h: 40, dy: 0 };
+  const kareSag = { x: 260, y: 550, w: 40, h: 40, dy: 0 };
+
+  let score = 0;
+  let gameOver = false;
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Hedefi çiz
+    ctx.fillStyle = "green";
+    ctx.fillRect(hedef.x, hedef.y, hedef.w, hedef.h);
+
+    // Alt kareleri çiz
+    ctx.fillStyle = "blue";
+    ctx.fillRect(kareSol.x, kareSol.y, kareSol.w, kareSol.h);
+    ctx.fillRect(kareSag.x, kareSag.y, kareSag.w, kareSag.h);
+
+    // Skoru göster
+    ctx.fillStyle = "black";
+    ctx.font = "18px Arial";
+    ctx.fillText("Skor: " + score, 10, 25);
+  }
+
+  function update() {
+    if (gameOver) return;
+
+    // Hedef sağa sola hareket etsin
+    hedef.x += hedef.dx;
+    if (hedef.x <= 0 || hedef.x + hedef.w >= canvas.width) {
+      hedef.dx *= -1;
+    }
+
+    // Kareleri hareket ettir
+    kareSol.y += kareSol.dy;
+    kareSag.y += kareSag.dy;
+
+    // Çarpışma kontrolü
+    [kareSol, kareSag].forEach(kare => {
+      if (kare.dy !== 0) {
+        if (
+          kare.x < hedef.x + hedef.w &&
+          kare.x + kare.w > hedef.x &&
+          kare.y < hedef.y + hedef.h &&
+          kare.y + kare.h > hedef.y
+        ) {
+          // Çarpışma oldu
+          endGame();
+        } else if (kare.y + kare.h < 0) {
+          // Yukarı çıktı ama çarpmadı
+          kare.dy = 0;
+          kare.y = 550;
+          score++;
+        }
+      }
+    });
+  }
+
+  function endGame() {
+    gameOver = true;
+    document.getElementById("gameOver").style.display = "block";
+    document.getElementById("restartBtn").style.display = "block";
+    document.getElementById("finalScore").textContent = score;
+  }
+
+  function restartGame() {
+    kareSol.y = 550;
+    kareSag.y = 550;
+    kareSol.dy = 0;
+    kareSag.dy = 0;
+    score = 0;
+    gameOver = false;
+    document.getElementById("gameOver").style.display = "none";
+    document.getElementById("restartBtn").style.display = "none";
+    loop();
+  }
+
+  function loop() {
+    if (!gameOver) {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "w") {
+      kareSol.dy = -5;
+      kareSag.dy = -5;
+    } else if (e.key === "q") {
+      kareSol.dy = -5;
+    } else if (e.key === "e") {
+      kareSag.dy = -5;
+    }
+  });
+
+  loop();
+</script>
+</body>
+</html>
