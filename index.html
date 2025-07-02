@@ -1,27 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spor Salonu Yönetimi</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="container">
+    <h1>Üye Kayıt Sistemi</h1>
+    
+    <form id="memberForm">
+      <input type="text" id="name" placeholder="Ad" required />
+      <input type="text" id="surname" placeholder="Soyad" required />
+      <input type="tel" id="phone" placeholder="Telefon" required />
+      <select id="membership">
+        <option value="1">1 Ay</option>
+        <option value="3">3 Ay</option>
+        <option value="12">12 Ay</option>
+      </select>
+      <select id="payment">
+        <option value="Ödendi">Ödendi</option>
+        <option value="Bekliyor">Bekliyor</option>
+      </select>
+      <button type="submit">Ekle</button>
+    </form>
 
+    <div class="filter">
+      <label for="filter">Filtrele:</label>
+      <select id="filter">
+        <option value="all">Tümü</option>
+        <option value="active">Aktif Üyeler</option>
+        <option value="expired">Süresi Dolanlar</option>
+      </select>
+    </div>
 
-    <button onclick="oyun1()">Oyun1</button>
-    <button onclick="oyun2()">Oyun2</button>
-    <script>
+    <h2>Üyeler</h2>
+    <table id="memberTable">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Soyad</th>
+          <th>Telefon</th>
+          <th>Başlangıç</th>
+          <th>Bitiş</th>
+          <th>Üyelik</th>
+          <th>Ödeme</th>
+          <th>Durum</th>
+          <th>Sil</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-
-        function oyun1(){
-        window.location.href = "ege.html";
-        }
-        function oyun2(){
-        window.location.href = "oyun2.html";
-        }
-    </script>
+  <script src="script.js"></script>
 </body>
-</html> 
+</html>
