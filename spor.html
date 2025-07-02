@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spor Salonu Yönetim Sistemi</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#2ecc71" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Excel export için SheetJS CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* Genel */
+  body {
+    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fa;
+    color: #34495e;
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    margin: 30px 0 15px;
+    font-weight: 800;
+    font-size: 2.8rem;
+    color: #2ecc71;
+    text-shadow: 0 2px 4px rgb(46 204 113 / 0.4);
+  }
+
+  /* Arama alanı */
+  #searchInput {
+    width: 90%;
+    max-width: 700px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 2px solid #d1d8e0;
+    font-size: 1.15rem;
+    margin-bottom: 25px;
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.07);
+    transition: border-color 0.3s ease;
+  }
+  #searchInput:focus {
+    border-color: #27ae60;
+    outline: none;
+  }
+
+  /* Form Kartı */
+  form {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgb(39 174 96 / 0.15);
+    max-width: 900px;
+    width: 90%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 24px 30px;
+    align-items: center;
+    margin-bottom: 40px;
+  }
+  form label {
+    font-weight: 700;
+    color: #27ae60;
+    margin-bottom: 8px;
+    display: block;
+    font-size: 1rem;
+  }
+  form input[type="text"],
+  form input[type="tel"],
+  form input[type="date"],
+  form input[type="number"],
+  form select,
+  form textarea,
+  form input[type="file"],
+  form input[type="url"] {
+    font-size: 1rem;
+    padding: 12px 15px;
+    border: 2px solid #d1d8e0;
+    border-radius: 14px;
+    box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.06);
+    transition: border-color 0.25s ease;
+    width: 100%;
+    font-weight: 500;
+    color: #2c3e50;
+  }
+  form input[type="text"]:focus,
+  form input[type="tel"]:focus,
+  form input[type="date"]:focus,
+  form input[type="number"]:focus,
+  form select:focus,
+  form textarea:focus,
+  form input[type="file"]:focus,
+  form input[type="url"]:focus {
+    border-color: #27ae60;
+    outline: none;
+    box-shadow: 0 0 6px #27ae60aa;
+  }
+  form textarea {
+    min-height: 72px;
+    resize: vertical;
+  }
+
+  #endDatePreview {
+    font-weight: 700;
+    color: #27ae60;
+    background: #e9f7ef;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 2px solid #27ae60;
+    user-select: none;
+    font-size: 1.1rem;
+  }
+
+  /* Uyarı */
+  .warning {
+    grid-column: 1 / -1;
+    color: #e74c3c;
+    font-weight: 800;
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 10px 0;
+  }
+
+  /* Kaydet Butonu */
+  button {
+    grid-column: 1 / -1;
+    background: #27ae60;
+    border: none;
+    color: white;
+    font-weight: 900;
+    font-size: 1.35rem;
+    padding: 18px 0;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgb(39 174 96 / 0.45);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  button:hover {
+    background: #1e8449;
+    box-shadow: 0 8px 24px rgb(30 132 73 / 0.6);
+  }
+
+  /* Tablo üstü bilgiler ve butonlar */
+  #tableHeader {
+    max-width: 1200px;
+    width: 90%;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  #memberCounts {
+    font-weight: 700;
+    font-size: 1.15rem;
+    user-select: none;
+  }
+  #memberCounts span {
+    padding: 6px 14px;
+    border-radius: 14px;
+    margin-right: 12px;
+    color: white;
+  }
+  #memberCounts .active {
+    background-color: #27ae60;
+  }
+  #memberCounts .total {
+    background-color: #95a5a6;
+  }
+
+  #exportButtons button {
+    background: #2980b9;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 18px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgb(41 128 185 / 0.7);
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+  }
+  #exportButtons button:hover {
+    background: #1c5985;
+  }
+  #exportButtons button + button {
+    margin-left: 14px;
+  }
+
+  /* Tablo */
+  table {
+    width: 95%;
+    max-width: 1200px;
+    border-collapse: separate;
+    border-spacing: 0 14px;
+    margin-bottom: 60px;
+  }
+  thead th {
+    background: #27ae60;
+    color: white;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 12px;
+    border-radius: 16px 16px 0 0;
+    text-align: center;
+    box-shadow: 0 3px 8px rgb(39 174 96 / 0.4);
+  }
+  tbody tr {
+    background: #ffffffcc;
+    box-shadow: 0 3px 8px rgb(0 0 0 / 0.08);
+    border-radius: 14px;
+    transition: box-shadow 0.3s ease;
+  }
+  tbody tr:hover {
+    box-shadow: 0 8px 18px rgb(39 174 96 / 0.35);
+  }
+  tbody td {
+    text-align: center;
+    padding: 14px 12px;
+    font-weight: 600;
+    color: #2c3e50;
+    vertical-align: middle;
+    font-size: 1rem;
+  }
+
+  /* Fotoğraf küçük boy */
+  .member-photo {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2.5px solid #27ae60;
+    box-shadow: 0 0 6px #27ae60cc;
+    transition: transform 0.25s ease;
+  }
+  .member-photo:hover {
+    transform: scale(1.1);
+  }
+
+  /* İşlem butonları */
+  .btn-group button {
+    margin: 0 4px;
+    background: #27ae60;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 14px;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgb(39 174 96 / 0.55);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .btn-group button.delete {
+    background: #e74c3c;
+    box-shadow: 0 4px 14px rgb(231 76 60 / 0.55);
+  }
+  .btn-group button.invoice {
+    background: #f39c12;
+    box-shadow: 0 4px 14px rgb(243 156 18 / 0.55);
+  }
+  .btn-group button:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 18px;
+  }
+
+  /* Modal detay */
+  #memberModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 30, 15, 0.85);
+    backdrop-filter: blur(6px);
+    justify-content: center;
+    align-items: center;
+    padding: 25px;
+    z-index: 10000;
+  }
+  #modalContent {
+    background: #f0f8f5;
+    padding: 30px 36px;
+    border-radius: 24px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 14px 36px rgb(0 0 0 / 0.25);
+    color: #145a32;
+    position: relative;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  #modalContent h2 {
+    margin-top: 0;
+    font-weight: 900;
+    font-size: 2rem;
+    color: #27ae60;
+    margin-bottom: 24px;
+  }
+  #modalContent p {
+    margin: 10px 0;
+    line-height: 1.4;
+  }
+  #modalContent img {
+    display: block;
+    margin: 24px auto 0;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #27ae60;
+    box-shadow: 0 0 18px #27ae6077;
+  }
+  #modalClose {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    cursor: pointer;
+    font-size: 1.8rem;
+    color: #27ae60;
+    font-weight: 900;
+    user-select: none;
+    transition: color 0.3s ease;
+  }
+  #modalClose:hover {
+    color: #1e8449;
+  }
+
+  /* Fotoğraf modal */
+  #photoModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 30, 15, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: zoom-out;
+    z-index: 11000;
+  }
+  #photoModal img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 20px;
+    box-shadow: 0 0 36px #27ae60cc;
+  }
+
+  /* Grafik */
+  #chartWrapper {
+    max-width: 900px;
+    width: 90%;
+    margin-bottom: 50px;
+    background: white;
+    border-radius: 22px;
+    padding: 28px 24px 18px 24px;
+    box-shadow: 0 16px 40px rgb(39 174 96 / 0.18);
+  }
+
+  /* Responsive */
+  @media (max-width: 840px) {
+    form {
+      padding: 20px 30px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px 25px;
+    }
+    #modalContent {
+      max-width: 340px;
+      font-size: 1rem;
+      padding: 24px 28px;
+    }
+    #modalContent h2 {
+      font-size: 1.6rem;
+    }
+    #tableHeader {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    #exportButtons {
+      margin-top: 12px;
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+    }
+  }
+  @media (max-width: 480px) {
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+    }
+    #searchInput {
+      font-size: 1rem;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+    }
+    button {
+      font-size: 1.2rem;
+      padding: 14px 0;
+    }
+    table {
+      width: 98%;
+      font-size: 0.9rem;
+    }
+    tbody td {
+      padding: 10px 8px;
+    }
+    .btn-group button {
+      padding: 6px 10px;
+      font-size: 1rem;
+    }
+  }
+
+  /* Yazdırma stilleri */
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #printArea, #printArea * {
+      visibility: visible;
+    }
+    #printArea {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      padding: 15px;
+      background: white;
+      color: black;
+    }
+    #printArea table {
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      margin-bottom: 0;
+      box-shadow: none;
+    }
+    #printArea thead th {
+      background: #27ae60;
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 8px 10px;
+      border-radius: 0;
+      box-shadow: none;
+      border: 1px solid #222;
+    }
+    #printArea tbody td {
+      padding: 6px 8px;
+      font-size: 0.9rem;
+      border: 1px solid #222;
+      color: black;
+      background: white;
+      font-weight: 600;
+    }
+    #printArea tbody tr {
+      box-shadow: none;
+      background: white;
+    }
+    #printArea .member-photo {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Spor Salonu Yönetim Sistemi</h1>
+
+<input type="text" id="searchInput" placeholder="Üye ismi ile arayın..." aria-label="Üye ismi ile ara" />
+
+<form id="memberForm" autocomplete="off" novalidate>
+  <div>
+    <label for="name">İsim*</label>
+    <input type="text" id="name" name="name" placeholder="İsim giriniz" required />
+  </div>
+  <div>
+    <label for="surname">Soyisim*</label>
+    <input type="text" id="surname" name="surname" placeholder="Soyisim giriniz" required />
+  </div>
+  <div>
+    <label for="photoFile">Profil Fotoğrafı (Dosya)</label>
+    <input type="file" id="photoFile" accept="image/*" />
+  </div>
+  <div>
+    <label for="photoURL">Profil Fotoğrafı URL (Alternatif)</label>
+    <input type="url" id="photoURL" placeholder="Fotoğraf URL'si giriniz" />
+  </div>
+  <div>
+    <label for="phone">Telefon*</label>
+    <input type="tel" id="phone" name="phone" placeholder="05xx xxx xx xx" pattern="^05\d{9}$" required />
+  </div>
+  <div>
+    <label for="gender">Cinsiyet*</label>
+    <select id="gender" name="gender" required>
+      <option value="">Seçiniz</option>
+      <option value="Erkek">Erkek</option>
+      <option value="Kadın">Kadın</option>
+      <option value="Diğer">Diğer</option>
+    </select>
+  </div>
+  <div>
+    <label for="startDate">Başlangıç Tarihi*</label>
+    <input type="date" id="startDate" name="startDate" required />
+  </div>
+  <div>
+    <label for="membershipMonths">Üyelik Süresi (Ay)*</label>
+    <select id="membershipMonths" name="membershipMonths" required>
+      <option value="">Seçiniz</option>
+      <option value="1">1 Ay</option>
+      <option value="3">3 Ay</option>
+      <option value="6">6 Ay</option>
+      <option value="12">12 Ay</option>
+    </select>
+  </div>
+  <div>
+    <label>Üyelik Bitiş Tarihi</label>
+    <div id="endDatePreview" aria-live="polite" aria-atomic="true">-</div>
+  </div>
+  <div>
+    <label for="discount">İndirim (%)</label>
+    <input type="number" id="discount" name="discount" min="0" max="100" step="1" placeholder="Varsa indirim" />
+  </div>
+  <div>
+    <label for="paymentMethod">Ödeme Türü</label>
+    <select id="paymentMethod" name="paymentMethod">
+      <option value="Nakit">Nakit</option>
+      <option value="Kredi Kartı">Kredi Kartı</option>
+      <option value="Havale">Havale</option>
+      <option value="Diğer">Diğer</option>
+    </select>
+  </div>
+  <div style="grid-column:1/-1;">
+    <label for="notes">Notlar</label>
+    <textarea id="notes" name="notes" placeholder="Ekstra notlar..."></textarea>
+  </div>
+
+  <div id="feedbackMessage" role="alert" style="grid-column: 1 / -1; font-weight: 700; font-size: 1.1rem; color: #27ae60;"></div>
+
+  <button type="submit" id="saveBtn">Kaydet</button>
+</form>
+
+<div id="tableHeader">
+  <div id="memberCounts" aria-live="polite" aria-atomic="true">
+    <span class="active">Aktif Üye: 0</span>
+    <span class="total">Toplam Üye: 0</span>
+  </div>
+  <div id="exportButtons">
+    <button id="exportExcel">Excel'e Aktar</button>
+    <button id="printTable">Yazdır</button>
+  </div>
+</div>
+
+<table aria-label="Üye Listesi">
+  <thead>
+    <tr>
+      <th>Fotoğraf</th>
+      <th>İsim</th>
+      <th>Soyisim</th>
+      <th>Telefon</th>
+      <th>Cinsiyet</th>
+      <th>Başlangıç Tarihi</th>
+      <th>Bitiş Tarihi</th>
+      <th>Üyelik Süresi (Ay)</th>
+      <th>İndirim %</th>
+      <th>Ödeme</th>
+      <th>Notlar</th>
+      <th>İşlemler</th>
+    </tr>
+  </thead>
+  <tbody id="memberTableBody" tabindex="0"></tbody>
+</table>
+
+<div id="chartWrapper" style="max-width:900px; width:90%;">
+  <canvas id="membershipChart" aria-label="Üyelik İstatistikleri Grafiği" role="img"></canvas>
+</div>
+
+<!-- Üye detay modal -->
+<div id="memberModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
+  <div id="modalContent">
+    <div id="modalClose" role="button" aria-label="Kapat" tabindex="0">&times;</div>
+    <h2 id="modalTitle">Üye Detayları</h2>
+    <p><strong>İsim Soyisim:</strong> <span id="modalName"></span></p>
+    <p><strong>Telefon:</strong> <span id="modalPhone"></span></p>
+    <p><strong>Cinsiyet:</strong> <span id="modalGender"></span></p>
+    <p><strong>Başlangıç Tarihi:</strong> <span id="modalStartDate"></span></p>
+    <p><strong>Bitiş Tarihi:</strong> <span id="modalEndDate"></span></p>
+    <p><strong>Üyelik Süresi:</strong> <span id="modalMonths"></span> ay</p>
+    <p><strong>İndirim:</strong> <span id="modalDiscount"></span> %</p>
+    <p><strong>Ödeme:</strong> <span id="modalPayment"></span></p>
+    <p><strong>Notlar:</strong> <span id="modalNotes"></span></p>
+    <img src="" alt="Üyenin Profil Fotoğrafı" id="modalPhoto" />
+  </div>
+</div>
+
+<!-- Fotoğraf zoom modal -->
+<div id="photoModal" tabindex="-1" aria-label="Profil fotoğrafı büyütme" role="dialog">
+  <img src="" alt="Büyütülmüş Profil Fotoğrafı" />
+</div>
+
+<script>
+  // Elemanlar
+  const form = document.getElementById("memberForm");
+  const nameInput = document.getElementById("name");
+  const surnameInput = document.getElementById("surname");
+  const phoneInput = document.getElementById("phone");
+  const genderSelect = document.getElementById("gender");
+  const startDateInput = document.getElementById("startDate");
+  const membershipSelect = document.getElementById("membershipMonths");
+  const discountInput = document.getElementById("discount");
+  const paymentSelect = document.getElementById("paymentMethod");
+  const notesInput = document.getElementById("notes");
+  const photoInput = document.getElementById("photoFile");
+  const photoUrlInput = document.getElementById("photoURL");
+  const feedbackMessage = document.getElementById("feedbackMessage");
+  const endDatePreview = document.getElementById("endDatePreview");
+  const saveBtn = document.getElementById("saveBtn");
+
+  const tbody = document.getElementById("memberTableBody");
+  const memberCounts = document.getElementById("memberCounts");
+  const exportExcelBtn = document.getElementById("exportExcel");
+  const printTableBtn = document.getElementById("printTable");
+
+  const memberModal = document.getElementById("memberModal");
+  const modalClose = document.getElementById("modalClose");
+  const modalName = document.getElementById("modalName");
+  const modalPhone = document.getElementById("modalPhone");
+  const modalGender = document.getElementById("modalGender");
+  const modalStartDate = document.getElementById("modalStartDate");
+  const modalEndDate = document.getElementById("modalEndDate");
+  const modalMonths = document.getElementById("modalMonths");
+  const modalDiscount = document.getElementById("modalDiscount");
+  const modalPayment = document.getElementById("modalPayment");
+  const modalNotes = document.getElementById("modalNotes");
+  const modalPhoto = document.getElementById("modalPhoto");
+
+  const photoModal = document.getElementById("photoModal");
+  const photoModalImg = photoModal.querySelector("img");
+
+  let members = [];
+  let editIndex = null;
+  let chart;
+
+  // Fonksiyonlar
+
+  // Base64 okuma (dosya)
+  function getBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Üyelik bitiş tarihi hesapla
+  function calculateEndDate(startDateStr, months) {
+    if (!startDateStr || !months) return null;
+    const startDate = new Date(startDateStr);
+    if (isNaN(startDate)) return null;
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + Number(months));
+    return endDate;
+  }
+
+  // Tarihi Türkçe ve YYYY-AA-GG formatında göster
+  function formatDate(date) {
+    if (!date) return "-";
+    const d = new Date(date);
+    if (isNaN(d)) return "-";
+    return d.toLocaleDateString("tr-TR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
+
+  // Geri bildirim mesajı göster
+  function showFeedbackMessage(message, isError = false) {
+    feedbackMessage.textContent = message;
+    feedbackMessage.style.color = isError ? "#e74c3c" : "#27ae60";
+    setTimeout(() => {
+      feedbackMessage.textContent = "";
+    }, 3500);
+  }
+
+  // Formu temizle
+  function resetForm() {
+    form.reset();
+    endDatePreview.textContent = "-";
+    feedbackMessage.textContent = "";
+    editIndex = null;
+    saveBtn.textContent = "Kaydet";
+  }
+
+  // Üyeleri localStorage'dan yükle
+  function loadMembers() {
+    const data = localStorage.getItem("members");
+    members = data ? JSON.parse(data) : [];
+  }
+
+  // Üyeleri localStorage'a kaydet
+  function saveMembers() {
+    localStorage.setItem("members", JSON.stringify(members));
+  }
+
+  // Üyeleri tabloya yazdır
+  function renderMembers(filter = "") {
+    tbody.innerHTML = "";
+
+    const filtered = members.filter(({ name, surname }) => {
+      const fullName = (name + " " + surname).toLowerCase();
+      return fullName.includes(filter.toLowerCase());
+    });
+
+    // Üye sayısı güncelle
+    const activeCount = filtered.filter(({ endDate }) => {
+      return new Date(endDate) >= new Date();
+    }).length;
+
+    memberCounts.innerHTML = `
+      <span class="active">Aktif Üye: ${activeCount}</span>
+      <span class="total">Toplam Üye: ${filtered.length}</span>
+    `;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="12" style="padding:20px; font-weight:600; font-size:1.1rem; color:#999;">Üye bulunamadı</td></tr>`;
+      updateChart(filtered);
+      return;
+    }
+
+    filtered.forEach((member, idx) => {
+      const {
+        name,
+        surname,
+        phone,
+        gender,
+        startDate,
+        endDate,
+        membershipMonths,
+        discount,
+        payment,
+        notes,
+        photo,
+      } = member;
+
+      // Fotoğraf src belirle
+      let photoSrc = "";
+      if (photo) {
+        if (photo.startsWith("data:image") || photo.startsWith("http")) {
+          photoSrc = photo;
+        } else {
+          photoSrc = "";
+        }
+      }
+
+      const endDateObj = new Date(endDate);
+      const now = new Date();
+      const isExpiringSoon = (endDateObj - now) / (1000 * 60 * 60 * 24) <= 7;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          ${
+            photoSrc
+              ? `<img src="${photoSrc}" alt="${name} ${surname} profil fotoğrafı" class="member-photo" tabindex="0" />`
+              : "—"
+          }
+        </td>
+        <td>${name}</td>
+        <td>${surname}</td>
+        <td>${phone}</td>
+        <td>${gender}</td>
+        <td>${formatDate(startDate)}</td>
+        <td style="color: ${
+          isExpiringSoon ? "#e74c3c" : "#27ae60"
+        }; font-weight: 700;">${formatDate(endDate)}</td>
+        <td>${membershipMonths}</td>
+        <td>${discount || 0}</td>
+        <td>${payment || "-"}</td>
+        <td>${notes || "-"}</td>
+        <td class="btn-group" aria-label="İşlemler">
+          <button type="button" class="editBtn" aria-label="Üyeyi düzenle">&#9998;</button>
+          <button type="button" class="delete" aria-label="Üyeyi sil">&#128465;</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    updateChart(filtered);
+  }
+
+  // Üyelik istatistiklerini grafikle göster
+  function updateChart(data) {
+    const counts = { "1": 0, "3": 0, "6": 0, "12": 0 };
+    data.forEach(({ membershipMonths }) => {
+      if (counts[membershipMonths] !== undefined) counts[membershipMonths]++;
+    });
+
+    const ctx = document.getElementById("membershipChart").getContext("2d");
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ["1 Ay", "3 Ay", "6 Ay", "12 Ay"],
+        datasets: [
+          {
+            label: "Üye Sayısı",
+            data: [counts["1"], counts["3"], counts["6"], counts["12"]],
+            backgroundColor: "#27ae60",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            stepSize: 1,
+            ticks: { precision: 0 },
+          },
+        },
+      },
+    });
+  }
+
+  // Form submit işlemi (Ekle/Güncelle)
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Zorunlu alan kontrolü
+    if (
+      !nameInput.value.trim() ||
+      !surnameInput.value.trim() ||
+      !phoneInput.value.trim() ||
+      !genderSelect.value ||
+      !startDateInput.value ||
+      !membershipSelect.value
+    ) {
+      showFeedbackMessage("Lütfen tüm zorunlu alanları doldurunuz.", true);
+      return;
+    }
+
+    // Telefon format kontrolü
+    if (!/^05\d{9}$/.test(phoneInput.value.trim())) {
+      showFeedbackMessage(
+        "Telefon numarası 05 ile başlayıp 11 haneli olmalıdır.",
+        true
+      );
+      return;
+    }
+
+    // Bitiş tarihi hesapla
+    const months = Number(membershipSelect.value);
+    const startDate = startDateInput.value;
+    const endDateObj = calculateEndDate(startDate, months);
+    if (!endDateObj) {
+      showFeedbackMessage("Geçerli bir başlangıç tarihi ve üyelik süresi seçiniz.", true);
+      return;
+    }
+
+    // Fotoğraf verisi (Dosya öncelikli, yoksa URL, yoksa eski fotoğraf)
+    let photoData = null;
+    if (photoInput.files.length > 0) {
+      try {
+        photoData = await getBase64(photoInput.files[0]);
+      } catch {
+        showFeedbackMessage("Fotoğraf okunamadı.", true);
+        return;
+      }
+    } else if (photoUrlInput.value.trim()) {
+      photoData = photoUrlInput.value.trim();
+    } else if (editIndex !== null && members[editIndex].photo) {
+      photoData = members[editIndex].photo;
+    }
+
+    const memberData = {
+      name: nameInput.value.trim(),
+      surname: surnameInput.value.trim(),
+      phone: phoneInput.value.trim(),
+      gender: genderSelect.value,
+      startDate: startDate,
+      membershipMonths: months,
+      endDate: endDateObj.toISOString(),
+      discount: Number(discountInput.value) || 0,
+      payment: paymentSelect.value,
+      notes: notesInput.value.trim(),
+      photo: photoData,
+    };
+
+    if (editIndex !== null) {
+      members[editIndex] = memberData;
+      showFeedbackMessage("Üye bilgileri güncellendi.");
+    } else {
+      members.push(memberData);
+      showFeedbackMessage("Yeni üye eklendi.");
+    }
+
+    saveMembers();
+    renderMembers();
+    resetForm();
+  });
+
+  // Başlangıç tarihi ve üyelik süresi değişince bitiş tarihi göster
+  function updateEndDatePreview() {
+    const months = Number(membershipSelect.value);
+    const startDate = startDateInput.value;
+    if (months && startDate) {
+      const endDate = calculateEndDate(startDate, months);
+      endDatePreview.textContent = formatDate(endDate);
+    } else {
+      endDatePreview.textContent = "-";
+    }
+  }
+
+  startDateInput.addEventListener("change", updateEndDatePreview);
+  membershipSelect.addEventListener("change", updateEndDatePreview);
+
+  // Üye fotoğrafı için dosya veya URL biri seçilince diğerini temizle
+  photoInput.addEventListener("change", () => {
+    if (photoInput.files.length > 0) {
+      photoUrlInput.value = "";
+    }
+  });
+  photoUrlInput.addEventListener("input", () => {
+    if (photoUrlInput.value.trim().length > 0) {
+      photoInput.value = "";
+    }
+  });
+
+  // Üye tablosunda butonlara tıklama
+  tbody.addEventListener("click", (e) => {
+    const target = e.target;
+    const tr = target.closest("tr");
+    if (!tr) return;
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const index = rows.indexOf(tr);
+    if (index < 0) return;
+
+    if (target.classList.contains("editBtn")) {
+      // Düzenleme modu
+      const member = members[index];
+      nameInput.value = member.name;
+      surnameInput.value = member.surname;
+      phoneInput.value = member.phone;
+      genderSelect.value = member.gender;
+      startDateInput.value = member.startDate;
+      membershipSelect.value = member.membershipMonths;
+      discountInput.value = member.discount || "";
+      paymentSelect.value = member.payment || "";
+      notesInput.value = member.notes || "";
+      photoInput.value = "";
+      photoUrlInput.value = "";
+      if (member.photo) {
+        if (
+          member.photo.startsWith("data:image") ||
+          member.photo.startsWith("http")
+        ) {
+          photoUrlInput.value = member.photo;
+        }
+      }
+      updateEndDatePreview();
+      editIndex = index;
+      saveBtn.textContent = "Güncelle";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      showFeedbackMessage("Üye bilgileri düzenleniyor...");
+    } else if (target.classList.contains("delete")) {
+      if (confirm("Bu üyeyi silmek istediğinize emin misiniz?")) {
+        members.splice(index, 1);
+        saveMembers();
+        renderMembers();
+        resetForm();
+        showFeedbackMessage("Üye silindi.");
+      }
+    } else if (target.classList.contains("member-photo") || target.tagName === "IMG") {
+      // Fotoğraf büyüt
+      const src = target.src;
+      if (src) {
+        photoModalImg.src = src;
+        photoModal.style.display = "flex";
+        photoModal.focus();
+      }
+    }
+  });
+
+  // Modal kapatma
+  modalClose.addEventListener("click", () => {
+    memberModal.style.display = "none";
+  });
+
+  // Fotoğraf modal kapatma
+  photoModal.addEventListener("click", () => {
+    photoModal.style.display = "none";
+    photoModalImg.src = "";
+  });
+
+  // Arama inputu
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    renderMembers(e.target.value);
+  });
+
+  // Excel'e aktar
+  exportExcelBtn.addEventListener("click", () => {
+    if (members.length === 0) {
+      alert("Aktif üye bulunamadı.");
+      return;
+    }
+    const worksheetData = [
+      [
+        "İsim",
+        "Soyisim",
+        "Telefon",
+        "Cinsiyet",
+        "Başlangıç Tarihi",
+        "Bitiş Tarihi",
+        "Üyelik Süresi (Ay)",
+        "İndirim (%)",
+        "Ödeme Türü",
+        "Notlar",
+      ],
+    ];
+    members.forEach((m) => {
+      worksheetData.push([
+        m.name,
+        m.surname,
+        m.phone,
+        m.gender,
+        formatDate(m.startDate),
+        formatDate(m.endDate),
+        m.membershipMonths,
+        m.discount,
+        m.payment,
+        m.notes,
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    XLSX.utils.book_append_sheet(wb, ws, "Üyeler");
+    XLSX.writeFile(wb, "spor_salon_uyeleri.xlsx");
+  });
+
+  // Yazdırma
+  printTableBtn.addEventListener("click", () => {
+    const printContent = document.createElement("div");
+    printContent.id = "printArea";
+    printContent.innerHTML = `
+      <h1>Spor Salonu Üye Listesi</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>İsim</th>
+            <th>Soyisim</th>
+            <th>Telefon</th>
+            <th>Cinsiyet</th>
+            <th>Başlangıç Tarihi</th>
+            <th>Bitiş Tarihi</th>
+            <th>Üyelik Süresi (Ay)</th>
+            <th>İndirim %</th>
+            <th>Ödeme Türü</th>
+            <th>Notlar</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${members
+            .map(
+              (m) => `
+            <tr>
+              <td>${m.name}</td>
+              <td>${m.surname}</td>
+              <td>${m.phone}</td>
+              <td>${m.gender}</td>
+              <td>${formatDate(m.startDate)}</td>
+              <td>${formatDate(m.endDate)}</td>
+              <td>${m.membershipMonths}</td>
+              <td>${m.discount}</td>
+              <td>${m.payment}</td>
+              <td>${m.notes}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+    document.body.appendChild(printContent);
+    window.print();
+    printContent.remove();
+  });
+
+  // Sayfa yüklenince verileri yükle ve göster
+  window.addEventListener("load", () => {
+    loadMembers();
+    renderMembers();
+  });
+</script>
+
+</body>
+</html>
