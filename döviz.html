@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gelişmiş Para Birimi Dönüştürücü + Grafik + Tema</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #2980b9;
+    color: #fff;
+    text-align: center;
+    padding: 40px;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  body.dark {
+    background: #121212;
+    color: #ddd;
+  }
+  .container {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 15px;
+    max-width: 450px;
+    margin: auto;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+  }
+  select, input {
+    padding: 10px;
+    width: 80%;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+  }
+  button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #3498db;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin: 5px;
+  }
+  button:hover {
+    background-color: #2980b9;
+  }
+  .result {
+    margin-top: 20px;
+    font-size: 20px;
+  }
+  .history {
+    margin-top: 30px;
+    background: rgba(255,255,255,0.15);
+    padding: 15px;
+    border-radius: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    text-align: left;
+  }
+  .history h3 {
+    margin-top: 0;
+  }
+  .history-item {
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    padding-bottom: 5px;
+  }
+  .update-time {
+    margin-top: 10px;
+    font-size: 14px;
+    opacity: 0.8;
+  }
+  .error {
+    color: #ff4d4d;
+    margin-top: 15px;
+  }
+  canvas {
+    margin-top: 25px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 10px;
+    max-width: 100%;
+  }
+  #themeToggle {
+    float: right;
+    margin-bottom: 15px;
+    cursor: pointer;
+    background: #555;
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <button id="themeToggle">Koyu Tema</button>
+    <h1>Gelişmiş Para Birimi Dönüştürücü</h1>
+    <input type="number" id="amount" placeholder="Miktar giriniz" value="1" min="0" />
+    <br />
+    <select id="fromCurrency">
+      <option value="USD">USD - ABD Doları</option>
+      <option value="EUR">EUR - Euro</option>
+      <option value="TRY">TRY - Türk Lirası</option>
+      <option value="GBP">GBP - İngiliz Sterlini</option>
+      <option value="JPY">JPY - Japon Yeni</option>
+      <option value="AUD">AUD - Avustralya Doları</option>
+      <option value="CAD">CAD - Kanada Doları</option>
+      <option value="CHF">CHF - İsviçre Frangı</option>
+    </select>
+    <br />
+    <select id="toCurrency">
+      <option value="USD">USD - ABD Doları</option>
+      <option value="EUR">EUR - Euro</option>
+      <option value="TRY">TRY - Türk Lirası</option>
+      <option value="GBP">GBP - İngiliz Sterlini</option>
+      <option value="JPY">JPY - Japon Yeni</option>
+      <option value="AUD">AUD - Avustralya Doları</option>
+      <option value="CAD">CAD - Kanada Doları</option>
+      <option value="CHF">CHF - İsviçre Frangı</option>
+    </select>
+    <br />
+    <button id="convertBtn">Dönüştür</button>
+    <button id="refreshBtn">Kurları Yenile</button>
+    <div class="error" id="error"></div>
+    <div class="result" id="result"></div>
+    <div class="update-time" id="updateTime"></div>
+
+    <div class="history" id="history">
+      <h3>Geçmiş Dönüşümler</h3>
+      <div id="historyList"></div>
+    </div>
+
+    <canvas id="rateChart" width="400" height="250"></canvas>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const currencyApiUrl = 'https://open.er-api.com/v6/latest/USD';
+    const historicalApiUrl = 'https://open.er-api.com/v6/history/USD'; // Open ER API free plan does not provide historical data, so we fake with static data for demo
+
+    const fromSelect = document.getElementById('fromCurrency');
+    const toSelect = document.getElementById('toCurrency');
+    const amountInput = document.getElementById('amount');
+    const resultDiv = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
+    const historyList = document.getElementById('historyList');
+    const updateTimeDiv = document.getElementById('updateTime');
+    const convertBtn = document.getElementById('convertBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const themeToggle = document.getElementById('themeToggle');
+    const rateChartCanvas = document.getElementById('rateChart');
+
+    let rates = {};
+    let lastUpdateTimestamp = null;
+    let chart = null;
+
+    function saveHistory(item) {
+      let history = JSON.parse(localStorage.getItem('conversionHistory')) || [];
+      history.unshift(item);
+      if (history.length > 10) history.pop();
+      localStorage.setItem('conversionHistory', JSON.stringify(history));
+    }
+
+    function loadHistory() {
+      const history = JSON.parse(localStorage.getItem('conversionHistory')) || [];
+      historyList.innerHTML = '';
+
+      if (history.length === 0) {
+        historyList.innerHTML = '<p>Henüz dönüşüm yapılmadı.</p>';
+        return;
+      }
+
+      history.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.textContent = `${item.date} - ${item.amount} ${item.from} = ${item.convertedAmount} ${item.to}`;
+        historyList.appendChild(div);
+      });
+    }
+
+    async function loadRates() {
+      errorDiv.textContent = '';
+      convertBtn.disabled = true;
+      refreshBtn.disabled = true;
+      updateTimeDiv.textContent = 'Kurlar yükleniyor...';
+      try {
+        const res = await fetch(currencyApiUrl);
+        if (!res.ok) throw new Error('API yanıt vermedi');
+        const data = await res.json();
+        rates = data.rates;
+        lastUpdateTimestamp = data.time_last_update_unix;
+        updateTimeDiv.textContent = `Son güncelleme: ${new Date(lastUpdateTimestamp * 1000).toLocaleString()}`;
+        convertBtn.disabled = false;
+        refreshBtn.disabled = false;
+        drawChart();
+      } catch (error) {
+        errorDiv.textContent = 'Döviz verileri alınamadı. İnternet bağlantınızı kontrol edin.';
+        updateTimeDiv.textContent = '';
+        convertBtn.disabled = true;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    function clearMessages() {
+      errorDiv.textContent = '';
+      resultDiv.textContent = '';
+    }
+
+    function convert() {
+      clearMessages();
+
+      const amount = parseFloat(amountInput.value);
+      const fromCurrency = fromSelect.value;
+      const toCurrency = toSelect.value;
+
+      if (isNaN(amount) || amount <= 0) {
+        errorDiv.textContent = 'Lütfen geçerli bir miktar giriniz.';
+        return;
+      }
+
+      if (!rates[fromCurrency] || !rates[toCurrency]) {
+        errorDiv.textContent = 'Geçersiz para birimi seçimi.';
+        return;
+      }
+
+      const amountInUSD = amount / rates[fromCurrency];
+      const convertedAmount = amountInUSD * rates[toCurrency];
+
+      const convertedFixed = convertedAmount.toFixed(4);
+
+      resultDiv.textContent = `${amount} ${fromCurrency} = ${convertedFixed} ${toCurrency}`;
+
+      const now = new Date();
+      saveHistory({
+        date: now.toLocaleString(),
+        amount,
+        from: fromCurrency,
+        to: toCurrency,
+        convertedAmount: convertedFixed
+      });
+      loadHistory();
+    }
+
+    // Basit demo amaçlı grafik için sahte geçmiş veri oluşturuyoruz
+    // Gerçek API ücretsiz versiyonda tarihsel veri sağlamıyor.
+    function getFakeHistoricalRates(baseCurrency) {
+      // Son 7 gün için rastgele veri oluşturuyoruz
+      const dates = [];
+      const values = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toLocaleDateString());
+        // Oran 0.8 ile 1.2 arasında dalgalansın
+        values.push((0.8 + Math.random() * 0.4).toFixed(4));
+      }
+      return {dates, values};
+    }
+
+    function drawChart() {
+      if (chart) chart.destroy();
+
+      const baseCurrency = fromSelect.value;
+      const targetCurrency = toSelect.value;
+
+      // Grafik için sahte veriyi al
+      const fakeData = getFakeHistoricalRates(baseCurrency);
+
+      chart = new Chart(rateChartCanvas, {
+        type: 'line',
+        data: {
+          labels: fakeData.dates,
+          datasets: [{
+            label: `${baseCurrency} kuru (fake)`,
+            data: fakeData.values,
+            borderColor: 'rgba(255, 255, 255, 0.8)',
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              labels: { color: getComputedStyle(document.body).color }
+            }
+          },
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.body).color } },
+            y: { ticks: { color: getComputedStyle(document.body).color } }
+          }
+        }
+      });
+    }
+
+    // Tema değiştirme
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      if(document.body.classList.contains('dark')) {
+        themeToggle.textContent = 'Açık Tema';
+      } else {
+        themeToggle.textContent = 'Koyu Tema';
+      }
+      if(chart) chart.update();
+    }
+
+    amountInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        convert();
+      }
+    });
+
+    convertBtn.addEventListener('click', convert);
+    refreshBtn.addEventListener('click', loadRates);
+    themeToggle.addEventListener('click', toggleTheme);
+
+    // Sayfa açılır açılmaz
+    loadRates();
+    loadHistory();
+  </script>
+</body>
+</html>
