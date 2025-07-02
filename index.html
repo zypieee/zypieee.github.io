@@ -73,7 +73,8 @@
   form input[type="number"],
   form select,
   form textarea,
-  form input[type="file"] {
+  form input[type="file"],
+  form input[type="url"] {
     font-size: 1rem;
     padding: 12px 15px;
     border: 2px solid #d1d8e0;
@@ -90,7 +91,8 @@
   form input[type="number"]:focus,
   form select:focus,
   form textarea:focus,
-  form input[type="file"]:focus {
+  form input[type="file"]:focus,
+  form input[type="url"]:focus {
     border-color: #27ae60;
     outline: none;
     box-shadow: 0 0 6px #27ae60aa;
@@ -477,8 +479,12 @@
     <input type="text" id="surname" name="surname" placeholder="Soyisim giriniz" required />
   </div>
   <div>
-    <label for="photo">Profil Fotoğrafı</label>
-    <input type="file" id="photo" accept="image/*" />
+    <label for="photoFile">Profil Fotoğrafı (Dosya)</label>
+    <input type="file" id="photoFile" accept="image/*" />
+  </div>
+  <div>
+    <label for="photoURL">Profil Fotoğrafı URL (Alternatif)</label>
+    <input type="url" id="photoURL" placeholder="Fotoğraf URL'si giriniz" />
   </div>
   <div>
     <label for="phone">Telefon*</label>
@@ -508,77 +514,92 @@
     </select>
   </div>
   <div>
-    <label>Bitiş Tarihi</label>
+    <label>Üyelik Bitiş Tarihi</label>
     <div id="endDatePreview" aria-live="polite" aria-atomic="true">-</div>
   </div>
   <div>
     <label for="discount">İndirim (%)</label>
-    <input type="number" id="discount" name="discount" min="0" max="100" placeholder="0" />
+    <input type="number" id="discount" name="discount" min="0" max="100" step="1" placeholder="Varsa indirim" />
   </div>
   <div>
-    <label for="payment">Ödeme Durumu</label>
-    <select id="payment" name="payment">
-      <option value="Ödendi">Ödendi</option>
-      <option value="Beklemede">Beklemede</option>
-      <option value="Gecikmeli">Gecikmeli</option>
+    <label for="paymentMethod">Ödeme Türü</label>
+    <select id="paymentMethod" name="paymentMethod">
+      <option value="Nakit">Nakit</option>
+      <option value="Kredi Kartı">Kredi Kartı</option>
+      <option value="Havale">Havale</option>
+      <option value="Diğer">Diğer</option>
     </select>
   </div>
-  <div style="grid-column: 1 / -1;">
+  <div style="grid-column:1/-1;">
     <label for="notes">Notlar</label>
-    <textarea id="notes" name="notes" placeholder="Eklemek istediğiniz notlar..."></textarea>
+    <textarea id="notes" name="notes" placeholder="Ekstra notlar..."></textarea>
   </div>
-  <div class="warning" id="renewalWarning" aria-live="polite"></div>
+
+  <div id="feedbackMessage" role="alert" style="grid-column: 1 / -1; font-weight: 700; font-size: 1.1rem; color: #27ae60;"></div>
+
   <button type="submit" id="saveBtn">Kaydet</button>
 </form>
 
-<div id="tableHeader" role="region" aria-label="Üye listesi üst bilgileri">
+<div id="tableHeader">
   <div id="memberCounts" aria-live="polite" aria-atomic="true">
     <span class="active">Aktif Üye: 0</span>
     <span class="total">Toplam Üye: 0</span>
   </div>
   <div id="exportButtons">
-    <button id="exportExcelBtn" aria-label="Üyeleri Excel dosyasına aktar">Excel'e Aktar</button>
-    <button id="printBtn" aria-label="Üye tablosunu yazdır">Yazdır</button>
+    <button id="exportExcel">Excel'e Aktar</button>
+    <button id="printTable">Yazdır</button>
   </div>
 </div>
 
-<table aria-label="Üye Listesi Tablosu">
+<table aria-label="Üye Listesi">
   <thead>
     <tr>
-      <th>Foto</th>
-      <th>İsim Soyisim</th>
+      <th>Fotoğraf</th>
+      <th>İsim</th>
+      <th>Soyisim</th>
       <th>Telefon</th>
       <th>Cinsiyet</th>
-      <th>Başlangıç</th>
-      <th>Bitiş</th>
-      <th>Süre</th>
-      <th>İndirim</th>
-      <th>Toplam Ücret</th>
-      <th>Durum</th>
+      <th>Başlangıç Tarihi</th>
+      <th>Bitiş Tarihi</th>
+      <th>Üyelik Süresi (Ay)</th>
+      <th>İndirim %</th>
       <th>Ödeme</th>
       <th>Notlar</th>
       <th>İşlemler</th>
     </tr>
   </thead>
-  <tbody id="membersTbody"></tbody>
+  <tbody id="memberTableBody" tabindex="0"></tbody>
 </table>
 
-<div id="chartWrapper">
-  <canvas id="memberChart" aria-label="Üyelik dağılım grafiği" role="img"></canvas>
+<div id="chartWrapper" style="max-width:900px; width:90%;">
+  <canvas id="membershipChart" aria-label="Üyelik İstatistikleri Grafiği" role="img"></canvas>
 </div>
 
-<!-- Üye Detay Modal -->
+<!-- Üye detay modal -->
 <div id="memberModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
   <div id="modalContent">
+    <div id="modalClose" role="button" aria-label="Kapat" tabindex="0">&times;</div>
+    <h2 id="modalTitle">Üye Detayları</h2>
+    <p><strong>İsim Soyisim:</strong> <span id="modalName"></span></p>
+    <p><strong>Telefon:</strong> <span id="modalPhone"></span></p>
+    <p><strong>Cinsiyet:</strong> <span id="modalGender"></span></p>
+    <p><strong>Başlangıç Tarihi:</strong> <span id="modalStartDate"></span></p>
+    <p><strong>Bitiş Tarihi:</strong> <span id="modalEndDate"></span></p>
+    <p><strong>Üyelik Süresi:</strong> <span id="modalMonths"></span> ay</p>
+    <p><strong>İndirim:</strong> <span id="modalDiscount"></span> %</p>
+    <p><strong>Ödeme:</strong> <span id="modalPayment"></span></p>
+    <p><strong>Notlar:</strong> <span id="modalNotes"></span></p>
+    <img src="" alt="Üyenin Profil Fotoğrafı" id="modalPhoto" />
   </div>
 </div>
 
-<!-- Fotoğraf Modal -->
-<div id="photoModal" role="dialog" aria-modal="true" tabindex="-1">
-  <img src="" alt="Profil fotoğrafı büyük hali" />
+<!-- Fotoğraf zoom modal -->
+<div id="photoModal" tabindex="-1" aria-label="Profil fotoğrafı büyütme" role="dialog">
+  <img src="" alt="Büyütülmüş Profil Fotoğrafı" />
 </div>
 
 <script>
+  // Elemanlar
   const form = document.getElementById("memberForm");
   const nameInput = document.getElementById("name");
   const surnameInput = document.getElementById("surname");
@@ -587,260 +608,276 @@
   const startDateInput = document.getElementById("startDate");
   const membershipSelect = document.getElementById("membershipMonths");
   const discountInput = document.getElementById("discount");
-  const paymentSelect = document.getElementById("payment");
+  const paymentSelect = document.getElementById("paymentMethod");
   const notesInput = document.getElementById("notes");
-  const photoInput = document.getElementById("photo");
+  const photoInput = document.getElementById("photoFile");
+  const photoUrlInput = document.getElementById("photoURL");
+  const feedbackMessage = document.getElementById("feedbackMessage");
   const endDatePreview = document.getElementById("endDatePreview");
-  const renewalWarning = document.getElementById("renewalWarning");
-  const tbody = document.getElementById("membersTbody");
-  const memberModal = document.getElementById("memberModal");
-  const modalContent = document.getElementById("modalContent");
-  const photoModal = document.getElementById("photoModal");
-  const modalImg = photoModal.querySelector("img");
-  const exportExcelBtn = document.getElementById("exportExcelBtn");
-  const printBtn = document.getElementById("printBtn");
+  const saveBtn = document.getElementById("saveBtn");
+
+  const tbody = document.getElementById("memberTableBody");
   const memberCounts = document.getElementById("memberCounts");
+  const exportExcelBtn = document.getElementById("exportExcel");
+  const printTableBtn = document.getElementById("printTable");
+
+  const memberModal = document.getElementById("memberModal");
+  const modalClose = document.getElementById("modalClose");
+  const modalName = document.getElementById("modalName");
+  const modalPhone = document.getElementById("modalPhone");
+  const modalGender = document.getElementById("modalGender");
+  const modalStartDate = document.getElementById("modalStartDate");
+  const modalEndDate = document.getElementById("modalEndDate");
+  const modalMonths = document.getElementById("modalMonths");
+  const modalDiscount = document.getElementById("modalDiscount");
+  const modalPayment = document.getElementById("modalPayment");
+  const modalNotes = document.getElementById("modalNotes");
+  const modalPhoto = document.getElementById("modalPhoto");
+
+  const photoModal = document.getElementById("photoModal");
+  const photoModalImg = photoModal.querySelector("img");
+
+  let members = [];
   let editIndex = null;
+  let chart;
 
-  let members = JSON.parse(localStorage.getItem("members") || "[]");
+  // Fonksiyonlar
 
-  // Tarih formatlama TR
-  function formatDateTr(dateStr) {
-    if(!dateStr) return "-";
-    const d = new Date(dateStr);
-    if(isNaN(d)) return "-";
-    return d.toLocaleDateString("tr-TR");
-  }
-
-  // Üyelik bitiş tarihi hesaplama
-  function calculateEndDate(startDateStr, months) {
-    if(!startDateStr || !months) return null;
-    const start = new Date(startDateStr);
-    if(isNaN(start)) return null;
-    const end = new Date(start);
-    end.setMonth(end.getMonth() + months);
-    return end;
-  }
-
-  // Ücret hesaplama (örnek fiyatlar)
-  function getPriceFromMonths(months) {
-    switch(months) {
-      case 1: return 150;
-      case 3: return 400;
-      case 6: return 750;
-      case 12: return 1400;
-      default: return 0;
-    }
-  }
-
-  // Toplam ücret hesaplama (indirimli)
-  function calculateTotal(price, discountPercent) {
-    if(!discountPercent) discountPercent = 0;
-    return Math.round(price * (1 - discountPercent / 100));
-  }
-
-  // Base64 fotoğraf okuma
+  // Base64 okuma (dosya)
   function getBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.onerror = e => reject(e);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
 
-  // Bitiş tarihi ve uyarı güncelleme
-  function updateEndDatePreview() {
-    const months = Number(membershipSelect.value);
-    const startDate = startDateInput.value;
-    const endDateObj = calculateEndDate(startDate, months);
-    if(!endDateObj) {
-      endDatePreview.textContent = "-";
-      renewalWarning.textContent = "";
+  // Üyelik bitiş tarihi hesapla
+  function calculateEndDate(startDateStr, months) {
+    if (!startDateStr || !months) return null;
+    const startDate = new Date(startDateStr);
+    if (isNaN(startDate)) return null;
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + Number(months));
+    return endDate;
+  }
+
+  // Tarihi Türkçe ve YYYY-AA-GG formatında göster
+  function formatDate(date) {
+    if (!date) return "-";
+    const d = new Date(date);
+    if (isNaN(d)) return "-";
+    return d.toLocaleDateString("tr-TR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
+
+  // Geri bildirim mesajı göster
+  function showFeedbackMessage(message, isError = false) {
+    feedbackMessage.textContent = message;
+    feedbackMessage.style.color = isError ? "#e74c3c" : "#27ae60";
+    setTimeout(() => {
+      feedbackMessage.textContent = "";
+    }, 3500);
+  }
+
+  // Formu temizle
+  function resetForm() {
+    form.reset();
+    endDatePreview.textContent = "-";
+    feedbackMessage.textContent = "";
+    editIndex = null;
+    saveBtn.textContent = "Kaydet";
+  }
+
+  // Üyeleri localStorage'dan yükle
+  function loadMembers() {
+    const data = localStorage.getItem("members");
+    members = data ? JSON.parse(data) : [];
+  }
+
+  // Üyeleri localStorage'a kaydet
+  function saveMembers() {
+    localStorage.setItem("members", JSON.stringify(members));
+  }
+
+  // Üyeleri tabloya yazdır
+  function renderMembers(filter = "") {
+    tbody.innerHTML = "";
+
+    const filtered = members.filter(({ name, surname }) => {
+      const fullName = (name + " " + surname).toLowerCase();
+      return fullName.includes(filter.toLowerCase());
+    });
+
+    // Üye sayısı güncelle
+    const activeCount = filtered.filter(({ endDate }) => {
+      return new Date(endDate) >= new Date();
+    }).length;
+
+    memberCounts.innerHTML = `
+      <span class="active">Aktif Üye: ${activeCount}</span>
+      <span class="total">Toplam Üye: ${filtered.length}</span>
+    `;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="12" style="padding:20px; font-weight:600; font-size:1.1rem; color:#999;">Üye bulunamadı</td></tr>`;
+      updateChart(filtered);
       return;
     }
-    endDatePreview.textContent = formatDateTr(endDateObj.toISOString());
 
-    // Uyarı: 10 gün içinde bitiyorsa
-    const today = new Date();
-    const diffTime = endDateObj - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if(diffDays <= 10 && diffDays >= 0) {
-      renewalWarning.textContent = `UYARI: Üyelik ${diffDays} gün içinde sona erecek!`;
-      renewalWarning.style.color = "#e74c3c";
-    } else {
-      renewalWarning.textContent = "";
-    }
-  }
+    filtered.forEach((member, idx) => {
+      const {
+        name,
+        surname,
+        phone,
+        gender,
+        startDate,
+        endDate,
+        membershipMonths,
+        discount,
+        payment,
+        notes,
+        photo,
+      } = member;
 
-  // Aktif ve toplam üye sayısı göster
-  function updateMemberCounts() {
-    const today = new Date();
-    const total = members.length;
-    const activeCount = members.filter(m => new Date(m.endDate) >= today).length;
-    memberCounts.querySelector(".active").textContent = `Aktif Üye: ${activeCount}`;
-    memberCounts.querySelector(".total").textContent = `Toplam Üye: ${total}`;
-  }
+      // Fotoğraf src belirle
+      let photoSrc = "";
+      if (photo) {
+        if (photo.startsWith("data:image") || photo.startsWith("http")) {
+          photoSrc = photo;
+        } else {
+          photoSrc = "";
+        }
+      }
 
-  // Üyeleri tabloya yazdırma ve filtreleme
-  function renderMembers() {
-    tbody.innerHTML = "";
-    const searchTerm = document.getElementById("searchInput").value.trim().toLowerCase();
-
-    members.forEach((m, index) => {
-      if(!m.name.toLowerCase().includes(searchTerm)) return;
-
-      const startDateFormatted = formatDateTr(m.startDate);
-      const endDateFormatted = formatDateTr(m.endDate);
-
-      const price = getPriceFromMonths(m.membershipMonths);
-      const total = calculateTotal(price, m.discount);
-
-      const today = new Date();
-      const endDateObj = new Date(m.endDate);
-      const active = endDateObj >= today;
+      const endDateObj = new Date(endDate);
+      const now = new Date();
+      const isExpiringSoon = (endDateObj - now) / (1000 * 60 * 60 * 24) <= 7;
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>
-          ${m.photo ? `<img src="${m.photo}" alt="Profil Fotoğrafı" class="member-photo" tabindex="0" />` : "-"}
+          ${
+            photoSrc
+              ? `<img src="${photoSrc}" alt="${name} ${surname} profil fotoğrafı" class="member-photo" tabindex="0" />`
+              : "—"
+          }
         </td>
-        <td>${m.name} ${m.surname}</td>
-        <td>${m.phone}</td>
-        <td>${m.gender}</td>
-        <td>${startDateFormatted}</td>
-        <td>${endDateFormatted}</td>
-        <td>${m.membershipMonths} Ay</td>
-        <td>%${m.discount || 0}</td>
-        <td>${total} ₺</td>
-        <td style="color:${active ? '#27ae60' : '#c0392b'}; font-weight:700;">${active ? "Aktif" : "Pasif"}</td>
-        <td>${m.payment}</td>
-        <td>${m.notes || "-"}</td>
-        <td class="btn-group" style="white-space: nowrap;">
-          <button class="editBtn" title="Düzenle" aria-label="Üyeyi düzenle">✏️</button>
-          <button class="delete" title="Sil" aria-label="Üyeyi sil">🗑️</button>
-          <button class="invoice" title="Fatura Göster" aria-label="Fatura göster">🧾</button>
+        <td>${name}</td>
+        <td>${surname}</td>
+        <td>${phone}</td>
+        <td>${gender}</td>
+        <td>${formatDate(startDate)}</td>
+        <td style="color: ${
+          isExpiringSoon ? "#e74c3c" : "#27ae60"
+        }; font-weight: 700;">${formatDate(endDate)}</td>
+        <td>${membershipMonths}</td>
+        <td>${discount || 0}</td>
+        <td>${payment || "-"}</td>
+        <td>${notes || "-"}</td>
+        <td class="btn-group" aria-label="İşlemler">
+          <button type="button" class="editBtn" aria-label="Üyeyi düzenle">&#9998;</button>
+          <button type="button" class="delete" aria-label="Üyeyi sil">&#128465;</button>
         </td>
       `;
       tbody.appendChild(tr);
     });
 
-    updateMemberCounts();
-    drawMemberChart();
+    updateChart(filtered);
   }
 
-  // Üyelik dağılım grafiği
-  function drawMemberChart() {
-    const ctx = document.getElementById('memberChart').getContext('2d');
-
-    const counts = {1:0, 3:0, 6:0, 12:0};
-    members.forEach(m => {
-      const mon = Number(m.membershipMonths);
-      counts[mon] = (counts[mon] || 0) + 1;
+  // Üyelik istatistiklerini grafikle göster
+  function updateChart(data) {
+    const counts = { "1": 0, "3": 0, "6": 0, "12": 0 };
+    data.forEach(({ membershipMonths }) => {
+      if (counts[membershipMonths] !== undefined) counts[membershipMonths]++;
     });
 
-    if(window.myChart) window.myChart.destroy();
-
-    window.myChart = new Chart(ctx, {
-      type: 'bar',
+    const ctx = document.getElementById("membershipChart").getContext("2d");
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "bar",
       data: {
-        labels: ['1 Ay', '3 Ay', '6 Ay', '12 Ay'],
-        datasets: [{
-          label: 'Üye Sayısı',
-          data: [counts[1], counts[3], counts[6], counts[12]],
-          backgroundColor: ['#27ae60','#2980b9','#f39c12','#8e44ad']
-        }]
+        labels: ["1 Ay", "3 Ay", "6 Ay", "12 Ay"],
+        datasets: [
+          {
+            label: "Üye Sayısı",
+            data: [counts["1"], counts["3"], counts["6"], counts["12"]],
+            backgroundColor: "#27ae60",
+          },
+        ],
       },
       options: {
         responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true },
+        },
         scales: {
           y: {
             beginAtZero: true,
-            precision: 0
-          }
+            stepSize: 1,
+            ticks: { precision: 0 },
+          },
         },
-        plugins: {
-          legend: {
-            display: false
-          }
-        }
-      }
+      },
     });
   }
 
-  // Modal açma
-  function openMemberModal(index) {
-    const m = members[index];
-    if(!m) return;
-
-    const startDateFormatted = formatDateTr(m.startDate);
-    const endDateFormatted = formatDateTr(m.endDate);
-    const price = getPriceFromMonths(m.membershipMonths);
-    const total = calculateTotal(price, m.discount);
-
-    modalContent.innerHTML = `
-      <span id="modalClose" role="button" aria-label="Kapat" tabindex="0">&times;</span>
-      <h2 id="modalTitle">${m.name} ${m.surname}</h2>
-      <p><strong>Telefon:</strong> ${m.phone}</p>
-      <p><strong>Cinsiyet:</strong> ${m.gender}</p>
-      <p><strong>Başlangıç:</strong> ${startDateFormatted}</p>
-      <p><strong>Bitiş:</strong> ${endDateFormatted}</p>
-      <p><strong>Üyelik Süresi:</strong> ${m.membershipMonths} Ay</p>
-      <p><strong>İndirim:</strong> %${m.discount || 0}</p>
-      <p><strong>Toplam Ücret:</strong> ${total} ₺</p>
-      <p><strong>Ödeme Durumu:</strong> ${m.payment}</p>
-      <p><strong>Notlar:</strong> ${m.notes || '-'}</p>
-      ${m.photo ? `<img src="${m.photo}" alt="Profil Fotoğrafı" />` : ""}
-    `;
-
-    memberModal.style.display = "flex";
-    const modalCloseBtn = document.getElementById("modalClose");
-    modalCloseBtn.focus();
-    modalCloseBtn.addEventListener("click", closeMemberModal);
-  }
-
-  // Modal kapatma
-  function closeMemberModal() {
-    memberModal.style.display = "none";
-  }
-
-  // Form submit işlemi
-  form.addEventListener("submit", async e => {
+  // Form submit işlemi (Ekle/Güncelle)
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if(!nameInput.value.trim() || !surnameInput.value.trim() || !phoneInput.value.trim() ||
-       !genderSelect.value || !startDateInput.value || !membershipSelect.value) {
-      alert("Lütfen tüm zorunlu alanları doldurunuz.");
+    // Zorunlu alan kontrolü
+    if (
+      !nameInput.value.trim() ||
+      !surnameInput.value.trim() ||
+      !phoneInput.value.trim() ||
+      !genderSelect.value ||
+      !startDateInput.value ||
+      !membershipSelect.value
+    ) {
+      showFeedbackMessage("Lütfen tüm zorunlu alanları doldurunuz.", true);
       return;
     }
 
-    if(!/^05\d{9}$/.test(phoneInput.value.trim())) {
-      alert("Telefon numarası 05 ile başlayıp 11 haneli olmalıdır.");
+    // Telefon format kontrolü
+    if (!/^05\d{9}$/.test(phoneInput.value.trim())) {
+      showFeedbackMessage(
+        "Telefon numarası 05 ile başlayıp 11 haneli olmalıdır.",
+        true
+      );
       return;
     }
 
+    // Bitiş tarihi hesapla
     const months = Number(membershipSelect.value);
     const startDate = startDateInput.value;
     const endDateObj = calculateEndDate(startDate, months);
-    if(!endDateObj) {
-      alert("Geçerli bir başlangıç tarihi ve üyelik süresi seçiniz.");
+    if (!endDateObj) {
+      showFeedbackMessage("Geçerli bir başlangıç tarihi ve üyelik süresi seçiniz.", true);
       return;
     }
 
-    // Fotoğraf base64 oku
+    // Fotoğraf verisi (Dosya öncelikli, yoksa URL, yoksa eski fotoğraf)
     let photoData = null;
-    if(photoInput.files.length > 0) {
+    if (photoInput.files.length > 0) {
       try {
         photoData = await getBase64(photoInput.files[0]);
       } catch {
-        alert("Fotoğraf okunamadı.");
+        showFeedbackMessage("Fotoğraf okunamadı.", true);
         return;
       }
-    } else if(editIndex !== null) {
-      photoData = members[editIndex].photo || null;
+    } else if (photoUrlInput.value.trim()) {
+      photoData = photoUrlInput.value.trim();
+    } else if (editIndex !== null && members[editIndex].photo) {
+      photoData = members[editIndex].photo;
     }
 
-    // Üye verisi oluştur
     const memberData = {
       name: nameInput.value.trim(),
       surname: surnameInput.value.trim(),
@@ -852,161 +889,214 @@
       discount: Number(discountInput.value) || 0,
       payment: paymentSelect.value,
       notes: notesInput.value.trim(),
-      photo: photoData
+      photo: photoData,
     };
 
-    if(editIndex !== null) {
+    if (editIndex !== null) {
       members[editIndex] = memberData;
-      alert("Üye bilgileri güncellendi.");
+      showFeedbackMessage("Üye bilgileri güncellendi.");
     } else {
       members.push(memberData);
-      alert("Yeni üye eklendi.");
+      showFeedbackMessage("Yeni üye eklendi.");
     }
 
-    localStorage.setItem("members", JSON.stringify(members));
+    saveMembers();
     renderMembers();
     resetForm();
   });
 
-  // Form temizleme
-  function resetForm() {
-    form.reset();
-    endDatePreview.textContent = "-";
-    renewalWarning.textContent = "";
-    editIndex = null;
-    photoInput.value = "";
-    document.getElementById("saveBtn").textContent = "Kaydet";
+  // Başlangıç tarihi ve üyelik süresi değişince bitiş tarihi göster
+  function updateEndDatePreview() {
+    const months = Number(membershipSelect.value);
+    const startDate = startDateInput.value;
+    if (months && startDate) {
+      const endDate = calculateEndDate(startDate, months);
+      endDatePreview.textContent = formatDate(endDate);
+    } else {
+      endDatePreview.textContent = "-";
+    }
   }
 
-  // Tablo butonları
-  tbody.addEventListener("click", e => {
+  startDateInput.addEventListener("change", updateEndDatePreview);
+  membershipSelect.addEventListener("change", updateEndDatePreview);
+
+  // Üye fotoğrafı için dosya veya URL biri seçilince diğerini temizle
+  photoInput.addEventListener("change", () => {
+    if (photoInput.files.length > 0) {
+      photoUrlInput.value = "";
+    }
+  });
+  photoUrlInput.addEventListener("input", () => {
+    if (photoUrlInput.value.trim().length > 0) {
+      photoInput.value = "";
+    }
+  });
+
+  // Üye tablosunda butonlara tıklama
+  tbody.addEventListener("click", (e) => {
     const target = e.target;
     const tr = target.closest("tr");
-    if(!tr) return;
+    if (!tr) return;
     const rows = Array.from(tbody.querySelectorAll("tr"));
     const index = rows.indexOf(tr);
+    if (index < 0) return;
 
-    if(target.classList.contains("editBtn")) {
-      editIndex = index;
-      const m = members[index];
-      if(!m) return;
-
-      nameInput.value = m.name;
-      surnameInput.value = m.surname;
-      phoneInput.value = m.phone;
-      genderSelect.value = m.gender;
-      startDateInput.value = m.startDate.slice(0,10);
-      membershipSelect.value = m.membershipMonths;
-      discountInput.value = m.discount || 0;
-      paymentSelect.value = m.payment;
-      notesInput.value = m.notes || "";
-      updateEndDatePreview();
-      document.getElementById("saveBtn").textContent = "Güncelle";
+    if (target.classList.contains("editBtn")) {
+      // Düzenleme modu
+      const member = members[index];
+      nameInput.value = member.name;
+      surnameInput.value = member.surname;
+      phoneInput.value = member.phone;
+      genderSelect.value = member.gender;
+      startDateInput.value = member.startDate;
+      membershipSelect.value = member.membershipMonths;
+      discountInput.value = member.discount || "";
+      paymentSelect.value = member.payment || "";
+      notesInput.value = member.notes || "";
       photoInput.value = "";
-
-      window.scrollTo({top:0, behavior:"smooth"});
-      return;
-    }
-    if(target.classList.contains("delete")) {
-      if(confirm("Üyeyi silmek istediğinize emin misiniz?")) {
-        members.splice(index,1);
-        localStorage.setItem("members", JSON.stringify(members));
+      photoUrlInput.value = "";
+      if (member.photo) {
+        if (
+          member.photo.startsWith("data:image") ||
+          member.photo.startsWith("http")
+        ) {
+          photoUrlInput.value = member.photo;
+        }
+      }
+      updateEndDatePreview();
+      editIndex = index;
+      saveBtn.textContent = "Güncelle";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      showFeedbackMessage("Üye bilgileri düzenleniyor...");
+    } else if (target.classList.contains("delete")) {
+      if (confirm("Bu üyeyi silmek istediğinize emin misiniz?")) {
+        members.splice(index, 1);
+        saveMembers();
         renderMembers();
         resetForm();
+        showFeedbackMessage("Üye silindi.");
       }
-      return;
-    }
-    if(target.classList.contains("invoice")) {
-      openMemberModal(index);
-      return;
-    }
-    if(target.classList.contains("member-photo")) {
-      modalImg.src = target.src;
-      photoModal.style.display = "flex";
-      return;
+    } else if (target.classList.contains("member-photo") || target.tagName === "IMG") {
+      // Fotoğraf büyüt
+      const src = target.src;
+      if (src) {
+        photoModalImg.src = src;
+        photoModal.style.display = "flex";
+        photoModal.focus();
+      }
     }
   });
 
   // Modal kapatma
-  memberModal.addEventListener("click", e => {
-    if(e.target === memberModal) closeMemberModal();
+  modalClose.addEventListener("click", () => {
+    memberModal.style.display = "none";
   });
+
+  // Fotoğraf modal kapatma
   photoModal.addEventListener("click", () => {
     photoModal.style.display = "none";
+    photoModalImg.src = "";
   });
 
-  // Tarih ve üyelik süresi değişince bitiş tarihi güncelle
-  startDateInput.addEventListener("change", updateEndDatePreview);
-  membershipSelect.addEventListener("change", updateEndDatePreview);
-
   // Arama inputu
-  document.getElementById("searchInput").addEventListener("input", renderMembers);
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    renderMembers(e.target.value);
+  });
 
-  // Excel'e aktarma fonksiyonu
-  function exportToExcel() {
-    const wb = XLSX.utils.book_new();
-    const wsData = [];
-
-    // Başlıklar
-    wsData.push([
-      "İsim Soyisim", "Telefon", "Cinsiyet", "Başlangıç Tarihi",
-      "Bitiş Tarihi", "Üyelik Süresi (Ay)", "İndirim (%)",
-      "Toplam Ücret (₺)", "Durum", "Ödeme Durumu", "Notlar"
-    ]);
-
-    const today = new Date();
-
-    members.forEach(m => {
-      // Aktif / Pasif
-      const endDateObj = new Date(m.endDate);
-      const active = endDateObj >= today ? "Aktif" : "Pasif";
-
-      const price = getPriceFromMonths(m.membershipMonths);
-      const total = calculateTotal(price, m.discount);
-
-      wsData.push([
-        `${m.name} ${m.surname}`,
+  // Excel'e aktar
+  exportExcelBtn.addEventListener("click", () => {
+    if (members.length === 0) {
+      alert("Aktif üye bulunamadı.");
+      return;
+    }
+    const worksheetData = [
+      [
+        "İsim",
+        "Soyisim",
+        "Telefon",
+        "Cinsiyet",
+        "Başlangıç Tarihi",
+        "Bitiş Tarihi",
+        "Üyelik Süresi (Ay)",
+        "İndirim (%)",
+        "Ödeme Türü",
+        "Notlar",
+      ],
+    ];
+    members.forEach((m) => {
+      worksheetData.push([
+        m.name,
+        m.surname,
         m.phone,
         m.gender,
-        formatDateTr(m.startDate),
-        formatDateTr(m.endDate),
+        formatDate(m.startDate),
+        formatDate(m.endDate),
         m.membershipMonths,
-        m.discount || 0,
-        total,
-        active,
+        m.discount,
         m.payment,
-        m.notes || "-"
+        m.notes,
       ]);
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     XLSX.utils.book_append_sheet(wb, ws, "Üyeler");
-    XLSX.writeFile(wb, "uyeler.xlsx");
-  }
-
-  exportExcelBtn.addEventListener("click", exportToExcel);
-
-  // Yazdırma fonksiyonu
-  printBtn.addEventListener("click", () => {
-    // Yazdırma için tabloyu bir container içine kopyala
-    let printArea = document.getElementById("printArea");
-    if(!printArea) {
-      printArea = document.createElement("div");
-      printArea.id = "printArea";
-      document.body.appendChild(printArea);
-    }
-    printArea.innerHTML = `
-      <h1>Spor Salonu Üye Listesi</h1>
-      <p>${memberCounts.querySelector(".active").textContent} | ${memberCounts.querySelector(".total").textContent}</p>
-      ${document.querySelector("table").outerHTML}
-    `;
-    window.print();
+    XLSX.writeFile(wb, "spor_salon_uyeleri.xlsx");
   });
 
-  // Sayfa yüklendiğinde
-  renderMembers();
-  updateEndDatePreview();
+  // Yazdırma
+  printTableBtn.addEventListener("click", () => {
+    const printContent = document.createElement("div");
+    printContent.id = "printArea";
+    printContent.innerHTML = `
+      <h1>Spor Salonu Üye Listesi</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>İsim</th>
+            <th>Soyisim</th>
+            <th>Telefon</th>
+            <th>Cinsiyet</th>
+            <th>Başlangıç Tarihi</th>
+            <th>Bitiş Tarihi</th>
+            <th>Üyelik Süresi (Ay)</th>
+            <th>İndirim %</th>
+            <th>Ödeme Türü</th>
+            <th>Notlar</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${members
+            .map(
+              (m) => `
+            <tr>
+              <td>${m.name}</td>
+              <td>${m.surname}</td>
+              <td>${m.phone}</td>
+              <td>${m.gender}</td>
+              <td>${formatDate(m.startDate)}</td>
+              <td>${formatDate(m.endDate)}</td>
+              <td>${m.membershipMonths}</td>
+              <td>${m.discount}</td>
+              <td>${m.payment}</td>
+              <td>${m.notes}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+    document.body.appendChild(printContent);
+    window.print();
+    printContent.remove();
+  });
 
+  // Sayfa yüklenince verileri yükle ve göster
+  window.addEventListener("load", () => {
+    loadMembers();
+    renderMembers();
+  });
 </script>
+
 </body>
 </html>
