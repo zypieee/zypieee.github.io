@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gelişmiş io Benzeri Oyun - Mini Harita ve İyileştirme</title>
+<style>
+  /* Temel */
+  body, html {
+    margin:0; padding:0; overflow:hidden; background:#121212;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color:#eee;
+    user-select:none;
+    cursor: crosshair;
+  }
+  #ui {
+    position: fixed;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 999;
+    text-align: center;
+    width: 100%;
+    max-width: 900px;
+    user-select:none;
+  }
+  #scoreBoard, #taskBoard, #leaderboard {
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-shadow: 0 0 4px #0008;
+  }
+  #scoreBoard {
+    font-size: 20px;
+    letter-spacing: 0.04em;
+  }
+  #taskBoard {
+    font-size: 14px;
+    color: #99ee99;
+  }
+  #leaderboard {
+    font-size: 16px;
+    margin-top: 8px;
+    text-align: left;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  #game {
+    background: radial-gradient(circle at center, #202830, #10141a);
+    display: block;
+    margin: 0 auto;
+    border-radius: 12px;
+    border: 3px solid #44ccff;
+    box-shadow: 0 0 18px #22aaffcc;
+    image-rendering: pixelated;
+  }
+  button,input {
+    font-size: 16px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+    margin-right: 6px;
+  }
+  button {
+    cursor: pointer;
+    background: #3399ff;
+    color: white;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background: #2277dd;
+  }
+  input[type=color] {
+    width: 40px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  input[type=file] {
+    display: inline-block;
+    vertical-align: middle;
+  }
+  label {
+    font-size: 14px;
+    margin-left: 10px;
+    cursor: pointer;
+  }
+  #reloadBar {
+    display: inline-block;
+    vertical-align: middle;
+    width: 180px;
+    height: 14px;
+    background: #444;
+    border-radius: 7px;
+    overflow: hidden;
+    margin-left: 12px;
+    box-shadow: inset 0 0 8px #0009;
+  }
+  #reloadProgress {
+    height: 100%;
+    width: 100%;
+    background: #44ccff;
+    transition: width 0.1s linear;
+  }
+
+  /* Mini Harita */
+  #miniMap {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    border: 2px solid #44ccff;
+    border-radius: 8px;
+    background: #111a22cc;
+    box-shadow: 0 0 10px #44ccffaa;
+    width: 180px;
+    height: 130px;
+    z-index: 9999;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <input type="text" id="nameInput" placeholder="Adınız" maxlength="10" />
+  <input type="color" id="colorInput" value="#44ccff" title="Renk seçiniz" />
+  <label for="avatarInput" title="Kendi resminizi seçin">
+    <input type="file" id="avatarInput" accept="image/png, image/jpeg" />
+    Karakter Resmi Yükle
+  </label>
+  <button id="startBtn">Oyuna Başla</button><br/>
+  <div id="scoreBoard">Skor: 0 | Can: 100 | Seviye: 1 | Mermi: 30/30</div>
+  <div id="reloadBar" title="Yenilenme">
+    <div id="reloadProgress"></div>
+  </div>
+  <div id="taskBoard">Görev: 10 puan topla!</div>
+  <div id="leaderboard"><strong>En İyi Oyuncular:</strong><br>Yok</div>
+</div>
+
+<canvas id="game" width="900" height="600"></canvas>
+<canvas id="miniMap" width="180" height="130" title="Mini Harita"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const miniMap = document.getElementById('miniMap');
+  const miniCtx = miniMap.getContext('2d');
+
+  const startBtn = document.getElementById('startBtn');
+  const nameInput = document.getElementById('nameInput');
+  const colorInput = document.getElementById('colorInput');
+  const avatarInput = document.getElementById('avatarInput');
+  const scoreBoard = document.getElementById('scoreBoard');
+  const taskBoard = document.getElementById('taskBoard');
+  const leaderboardDiv = document.getElementById('leaderboard');
+  const reloadBar = document.getElementById('reloadProgress');
+
+  const WIDTH = 3000;
+  const HEIGHT = 2200;
+  const VIEW_WIDTH = canvas.width;
+  const VIEW_HEIGHT = canvas.height;
+
+  const MINI_SCALE = miniMap.width / WIDTH;
+
+  let keys = {};
+  let gameStarted = false;
+  let bullets = [];
+  let players = [];
+  let powerups = [];
+  let walls = [];
+  let taskGoal = 10;
+
+  let selfPlayer = null;
+  let camX = 0;
+  let camY = 0;
+
+  let mouseX = VIEW_WIDTH/2;
+  let mouseY = VIEW_HEIGHT/2;
+
+  const MAX_BULLETS = 900; // Şarjör 30 mermi
+  let bulletsLeft = MAX_BULLETS;
+  const RELOAD_DURATION = 120;
+  let reloadTime = 0;
+
+  const SHOOT_COOLDOWN = 140; // Ateş hızı (ms)
+  let lastShotTime = 0;
+  let mouseDown = false;
+
+  const NPC_RESPAWN_TIME = 600;
+
+  let avatarImg = null;
+  const defaultAvatarSrc = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMu\nb3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMyIDMzQzM5LjM3MiAzMyA0NiAzOS4wNzMgNDYgNDcuNjQzQzQ2IDU2LjgyNyAzOS4zNzIgNjQgMzIgNjRD\nMjQuNjI4IDY0IDE4IDU2LjgyNyAxOCA0Ny42NDNDMTggMzkuMDczIDI0LjYyOCAzMyAzMiAzM1oiIGZpbGw9IiM0NGNjZmYiLz4KPHJlY3QgeD0i\nMjgiIHk9IjE1IiB3aWR0aD0iOCIg\n aGVpZ2h0PSI0IiBmaWxsPSIjMDA3ZmZmIi8+Cjwvc3ZnPgo=";
+
+  // Yardımcı fonksiyonlar
+  function circleCollision(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy) < a.radius + b.radius;
+  }
+
+  function bulletCollision(bullet, player) {
+    const dx = bullet.x - player.x;
+    const dy = bullet.y - player.y;
+    return Math.hypot(dx, dy) < bullet.radius + player.radius;
+  }
+
+  class Player {
+    constructor(name, color, x, y, isSelf = false, avatar=null) {
+      this.name = name || 'Oyuncu';
+      this.color = color || '#44ccff';
+      this.x = x;
+      this.y = y;
+      this.radius = 20;
+      this.isSelf = isSelf;
+
+      this.vx = 0;
+      this.vy = 0;
+      this.maxSpeed = 3.6;
+      this.acceleration = 0.24;
+      this.friction = 0.12;
+
+      this.score = 0;
+      this.level = 1;
+
+      this.hp = 100;
+      this.maxHp = 100;
+
+      this.speedBoostTimer = 0;
+      this.shieldTimer = 0;
+      this.damageBoostTimer = 0;
+      this.dead = false;
+
+      this.angle = 0;
+
+      this.target = null;
+      this.xp = 0;
+      this.xpToNextLevel = 50;
+
+      this.respawnCounter = 0;
+
+      this.lastShoot = 0;
+
+      this.avatar = avatar;
+    }
+
+    update() {
+      if(this.dead) {
+        if(!this.isSelf) {
+          this.respawnCounter--;
+          if(this.respawnCounter <= 0) this.respawn();
+        }
+        return;
+      }
+
+      if(this.isSelf) {
+        let ax = 0, ay = 0;
+        if (keys['arrowup'] || keys['w']) ay -= 1;
+        if (keys['arrowdown'] || keys['s']) ay += 1;
+        if (keys['arrowleft'] || keys['a']) ax -= 1;
+        if (keys['arrowright'] || keys['d']) ax += 1;
+
+        if (ax !== 0 && ay !== 0) {
+          ax *= Math.SQRT1_2;
+          ay *= Math.SQRT1_2;
+        }
+
+        this.vx += ax * this.acceleration;
+        this.vy += ay * this.acceleration;
+
+        let currentMaxSpeed = this.maxSpeed;
+        if(this.speedBoostTimer > 0) currentMaxSpeed *= 1.7;
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed > currentMaxSpeed) {
+          this.vx = (this.vx / speed) * currentMaxSpeed;
+          this.vy = (this.vy / speed) * currentMaxSpeed;
+        }
+
+        this.vx *= 1 - this.friction;
+        this.vy *= 1 - this.friction;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        this.x = Math.min(Math.max(this.radius, this.x), WIDTH - this.radius);
+        this.y = Math.min(Math.max(this.radius, this.y), HEIGHT - this.radius);
+
+        if(this.speedBoostTimer > 0) this.speedBoostTimer--;
+        if(this.shieldTimer > 0) this.shieldTimer--;
+        if(this.damageBoostTimer > 0) this.damageBoostTimer--;
+
+        // Nişangah açısı (burada takılma sorunu çözümü için optimize edildi)
+        let dx = mouseX + camX - this.x;
+        let dy = mouseY + camY - this.y;
+        this.angle = Math.atan2(dy, dx);
+
+      } else {
+        if(this.dead) return;
+
+        if(!this.target || this.target.dead || Math.random() < 0.007) {
+          let minDist = 99999;
+          let target = null;
+          for(let p of players) {
+            if(p === this || p.dead) continue;
+            const dx = p.x - this.x;
+            const dy = p.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            if(dist < minDist) {
+              minDist = dist;
+              target = p;
+            }
+          }
+          this.target = target;
+        }
+
+        if(this.target && !this.target.dead) {
+          const dx = this.target.x - this.x;
+          const dy = this.target.y - this.y;
+          const dist = Math.hypot(dx, dy);
+
+          const hpRatio = this.hp / this.maxHp;
+          if(hpRatio < 0.35) {
+            const awayX = this.x - this.target.x;
+            const awayY = this.y - this.target.y;
+            const awayDist = Math.hypot(awayX, awayY);
+            if(awayDist > 0) {
+              this.vx += (awayX / awayDist) * 0.27;
+              this.vy += (awayY / awayDist) * 0.27;
+            }
+          } else {
+            if(dist > 180) {
+              this.vx += (dx / dist) * 0.15;
+              this.vy += (dy / dist) * 0.15;
+            } else if(dist < 90) {
+              this.vx -= (dx / dist) * 0.15;
+              this.vy -= (dy / dist) * 0.15;
+            }
+          }
+
+          const speed = Math.hypot(this.vx, this.vy);
+          const maxSpeed = hpRatio < 0.35 ? 2.2 : 2.7;
+          if(speed > maxSpeed) {
+            this.vx = (this.vx / speed) * maxSpeed;
+            this.vy = (this.vy / speed) * maxSpeed;
+          }
+
+          this.x += this.vx;
+          this.y += this.vy;
+
+          this.x = Math.min(Math.max(this.radius, this.x), WIDTH - this.radius);
+          this.y = Math.min(Math.max(this.radius, this.y), HEIGHT - this.radius);
+
+          this.angle = Math.atan2(dy, dx);
+
+          const now = performance.now();
+          if(now - this.lastShoot > 1300 && hpRatio >= 0.3 && dist < 350) {
+            this.shootAt(this.target);
+            this.lastShoot = now;
+          }
+        }
+      }
+    }
+
+    respawn() {
+      this.x = 100 + Math.random() * (WIDTH - 200);
+      this.y = 100 + Math.random() * (HEIGHT - 200);
+      this.hp = this.maxHp;
+      this.dead = false;
+      this.respawnCounter = 0;
+      this.vx = 0;
+      this.vy = 0;
+      this.score = 0;
+      this.target = null;
+    }
+
+    shootAt(target) {
+      if(this.dead) return;
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist === 0) return;
+      const dirX = dx / dist;
+      const dirY = dy / dist;
+      bullets.push(new Bullet(this, this.x + dirX * this.radius, this.y + dirY * this.radius, dirX * 14, dirY * 14));
+    }
+
+    draw() {
+      if(this.dead) {
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(this.x - camX, this.y - camY, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        return;
+      }
+
+      const hpRatio = this.hp / this.maxHp;
+      const r = Math.floor(255 * (1 - hpRatio));
+      const g = Math.floor(255 * hpRatio);
+      const nameColor = `rgb(${r},${g},0)`;
+
+      if(this.shieldTimer > 0) {
+        ctx.shadowColor = '#0ff';
+        ctx.shadowBlur = 20;
+      } else if(this.speedBoostTimer > 0) {
+        ctx.shadowColor = '#0ff';
+        ctx.shadowBlur = 10;
+      } else {
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.save();
+      ctx.translate(this.x - camX, this.y - camY);
+      ctx.rotate(this.angle);
+
+      if(this.avatar && this.avatar.complete) {
+        const size = this.radius * 2.1;
+        ctx.drawImage(this.avatar, -this.radius, -this.radius, size, size);
+      } else {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Silah
+      ctx.fillStyle = this.damageBoostTimer > 0 ? '#ff5522' : '#0044ff';
+      ctx.fillRect(this.radius - 2, -5, 20, 10);
+
+      ctx.restore();
+
+      // İsim
+      ctx.font = "bold 13px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillStyle = nameColor;
+      ctx.shadowColor = '#000a';
+      ctx.shadowBlur = 3;
+      ctx.fillText(this.name, this.x - camX, this.y - camY - this.radius - 10);
+
+      // Can bar
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#222';
+      ctx.fillRect(this.x - camX - this.radius, this.y - camY + this.radius + 8, this.radius * 2, 6);
+      ctx.fillStyle = '#44cc44';
+      ctx.fillRect(this.x - camX - this.radius, this.y - camY + this.radius + 8, this.radius * 2 * hpRatio, 6);
+
+      // Level ve XP bar
+      ctx.fillStyle = '#555';
+      ctx.fillRect(this.x - camX - this.radius, this.y - camY + this.radius + 16, this.radius * 2, 4);
+      const xpRatio = Math.min(this.xp / this.xpToNextLevel, 1);
+      ctx.fillStyle = '#44aaff';
+      ctx.fillRect(this.x - camX - this.radius, this.y - camY + this.radius + 16, this.radius * 2 * xpRatio, 4);
+      ctx.fillStyle = '#ddd';
+      ctx.font = "10px 'Segoe UI'";
+      ctx.fillText(`Lv${this.level}`, this.x - camX, this.y - camY + this.radius + 34);
+    }
+  }
+
+  class Bullet {
+    constructor(owner, x, y, vx, vy) {
+      this.owner = owner;
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.radius = 5;
+      this.dead = false;
+      this.damage = owner.damageBoostTimer > 0 ? 30 : 18;
+      this.life = 90;
+    }
+
+    update() {
+      if(this.dead) return;
+      this.x += this.vx;
+      this.y += this.vy;
+      this.life--;
+      if(this.life <= 0) {
+        this.dead = true;
+        return;
+      }
+
+      // Duvar çarpması
+      for(let w of walls) {
+        if(w.x < this.x && this.x < w.x + w.width && w.y < this.y && this.y < w.y + w.height) {
+          this.dead = true;
+          return;
+        }
+      }
+
+      // Oyuncu çarpması
+      for(let p of players) {
+        if(p !== this.owner && !p.dead && bulletCollision(this, p)) {
+          if(p.shieldTimer > 0) {
+            this.dead = true;
+            break;
+          }
+          p.hp -= this.damage;
+          if(p.hp <= 0) {
+            p.dead = true;
+            p.respawnCounter = NPC_RESPAWN_TIME;
+            if(this.owner.isSelf) {
+              this.owner.score += 7;
+              this.owner.xp += 12;
+              checkLevelUp(this.owner);
+              checkTask(this.owner);
+            }
+          }
+          this.dead = true;
+          break;
+        }
+      }
+    }
+
+    draw() {
+      if(this.dead) return;
+      ctx.fillStyle = '#44ccff';
+      ctx.shadowColor = '#44ccff';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(this.x - camX, this.y - camY, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  class Wall {
+    constructor(x, y, w, h) {
+      this.x = x;
+      this.y = y;
+      this.width = w;
+      this.height = h;
+    }
+
+    draw() {
+      ctx.fillStyle = '#336677';
+      ctx.fillRect(this.x - camX, this.y - camY, this.width, this.height);
+    }
+  }
+
+  // Görev kontrolü
+  function checkTask(player) {
+    if(player.score >= taskGoal) {
+      taskGoal += 10;
+      taskBoard.textContent = `Görev: ${taskGoal} puan topla!`;
+      // Ödül
+      player.hp = Math.min(player.hp + 40, player.maxHp);
+      player.xp += 20;
+      checkLevelUp(player);
+    }
+  }
+
+  function checkLevelUp(player) {
+    while(player.xp >= player.xpToNextLevel) {
+      player.xp -= player.xpToNextLevel;
+      player.level++;
+      player.xpToNextLevel = Math.floor(player.xpToNextLevel * 1.3);
+      player.maxHp += 10;
+      player.hp = player.maxHp;
+      // Speed boost ödülü
+      player.speedBoostTimer = 360;
+      player.damageBoostTimer = 360;
+      // Seviye atlama efekti (ekran titremesi gibi)
+      screenShake(15, 8);
+    }
+  }
+
+  // Ekran sallama
+  let shakeTime = 0;
+  let shakeIntensity = 0;
+  function screenShake(time, intensity) {
+    shakeTime = time;
+    shakeIntensity = intensity;
+  }
+
+  // Oyun döngüsü
+  function update() {
+    if(!gameStarted) return;
+
+    if(selfPlayer && !selfPlayer.dead) {
+      // Reload mekanizması
+      if(bulletsLeft < MAX_BULLETS) {
+        reloadTime++;
+        reloadBar.style.width = (reloadTime / RELOAD_DURATION * 100) + '%';
+        if(reloadTime >= RELOAD_DURATION) {
+          bulletsLeft++;
+          reloadTime = 0;
+        }
+      } else {
+        reloadBar.style.width = '100%';
+        reloadTime = 0;
+      }
+
+      // Ateş etme
+      if(mouseDown && bulletsLeft > 0 && performance.now() - lastShotTime > SHOOT_COOLDOWN) {
+        bullets.push(new Bullet(selfPlayer,
+          selfPlayer.x + Math.cos(selfPlayer.angle) * selfPlayer.radius,
+          selfPlayer.y + Math.sin(selfPlayer.angle) * selfPlayer.radius,
+          Math.cos(selfPlayer.angle) * 18,
+          Math.sin(selfPlayer.angle) * 18));
+        bulletsLeft--;
+        lastShotTime = performance.now();
+      }
+
+      selfPlayer.update();
+    }
+
+    // NPC Güncelle
+    for(let p of players) {
+      if(!p.isSelf) p.update();
+    }
+
+    // Mermileri güncelle
+    bullets.forEach(b => b.update());
+    bullets = bullets.filter(b => !b.dead);
+
+    // Kamera
+    if(selfPlayer) {
+      camX = selfPlayer.x - VIEW_WIDTH/2;
+      camY = selfPlayer.y - VIEW_HEIGHT/2;
+
+      // Shake
+      if(shakeTime > 0) {
+        const dx = (Math.random() - 0.5) * shakeIntensity;
+        const dy = (Math.random() - 0.5) * shakeIntensity;
+        camX += dx;
+        camY += dy;
+        shakeTime--;
+      }
+
+      camX = Math.min(Math.max(0, camX), WIDTH - VIEW_WIDTH);
+      camY = Math.min(Math.max(0, camY), HEIGHT - VIEW_HEIGHT);
+    }
+  }
+
+  function draw() {
+    if(!gameStarted) return;
+
+    // Arka plan
+    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.fillStyle = '#10141a';
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+    // Duvarlar
+    for(let w of walls) w.draw();
+
+    // Poweruplar - Şimdilik yok
+
+    // Oyuncular
+    for(let p of players) p.draw();
+
+    // Mermiler
+    for(let b of bullets) b.draw();
+
+    // UI güncelleme
+    if(selfPlayer) {
+      scoreBoard.textContent = `Skor: ${selfPlayer.score} | Can: ${Math.max(0, Math.floor(selfPlayer.hp))} | Seviye: ${selfPlayer.level} | Mermi: ${bulletsLeft}/${MAX_BULLETS}`;
+    }
+
+    drawMiniMap();
+  }
+
+  // Mini harita çizimi
+  function drawMiniMap() {
+    miniCtx.clearRect(0, 0, miniMap.width, miniMap.height);
+    miniCtx.fillStyle = '#112233';
+    miniCtx.fillRect(0, 0, miniMap.width, miniMap.height);
+
+    // Duvarlar
+    miniCtx.fillStyle = '#446677';
+    for(let w of walls) {
+      miniCtx.fillRect(w.x * MINI_SCALE, w.y * MINI_SCALE, w.width * MINI_SCALE, w.height * MINI_SCALE);
+    }
+
+    // Oyuncular
+    for(let p of players) {
+      if(p.dead) continue;
+      miniCtx.fillStyle = p.isSelf ? '#44ccff' : '#cc4444';
+      miniCtx.beginPath();
+      miniCtx.arc(p.x * MINI_SCALE, p.y * MINI_SCALE, 4, 0, Math.PI * 2);
+      miniCtx.fill();
+    }
+
+    // Görüş alanı (kamera)
+    miniCtx.strokeStyle = '#44ccff';
+    miniCtx.lineWidth = 2;
+    miniCtx.strokeRect(camX * MINI_SCALE, camY * MINI_SCALE, VIEW_WIDTH * MINI_SCALE, VIEW_HEIGHT * MINI_SCALE);
+  }
+
+  // Başlatma
+  function startGame() {
+    if(gameStarted) return;
+    let playerName = nameInput.value.trim();
+    if(playerName.length === 0) playerName = 'Oyuncu';
+    const playerColor = colorInput.value;
+
+    selfPlayer = new Player(playerName, playerColor, WIDTH/2, HEIGHT/2, true, avatarImg);
+    players.push(selfPlayer);
+
+    // NPC oluştur (40 adet)
+    for(let i=0; i<40; i++) {
+      let npc = new Player('NPC'+(i+1), '#cc4444',
+        100 + Math.random() * (WIDTH-200),
+        100 + Math.random() * (HEIGHT-200));
+      players.push(npc);
+    }
+
+    // Duvarlar oluştur
+    createWalls();
+
+    taskGoal = 10;
+    taskBoard.textContent = `Görev: ${taskGoal} puan topla!`;
+
+    bullets = [];
+    bulletsLeft = MAX_BULLETS;
+    reloadTime = 0;
+
+    gameStarted = true;
+  }
+
+  function createWalls() {
+    walls = [];
+    // Ana duvarlar
+    walls.push(new Wall(0, 0, WIDTH, 20));
+    walls.push(new Wall(0, HEIGHT - 20, WIDTH, 20));
+    walls.push(new Wall(0, 0, 20, HEIGHT));
+    walls.push(new Wall(WIDTH - 20, 0, 20, HEIGHT));
+
+    // Orta duvarlar ve engeller (rastgele yerleştirme)
+    for(let i=0; i<18; i++) {
+      const w = 140 + Math.random() * 500;
+      const h = 70 + Math.random() * 200;
+      const x = 100 + Math.random() * (WIDTH - w - 200);
+      const y = 100 + Math.random() * (HEIGHT - h - 200);
+      walls.push(new Wall(x, y, w, h));
+    }
+  }
+
+  // Olaylar
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+  });
+  window.addEventListener('keyup', e => {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+
+  canvas.addEventListener('mousedown', e => {
+    mouseDown = true;
+  });
+  canvas.addEventListener('mouseup', e => {
+    mouseDown = false;
+  });
+
+  avatarInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const img = new Image();
+    img.onload = () => {
+      avatarImg = img;
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  startBtn.addEventListener('click', () => {
+    startGame();
+  });
+
+  // Oyun döngüsü
+  function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+
+</body>
+</html>
