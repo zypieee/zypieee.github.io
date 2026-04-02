@@ -123,6 +123,9 @@
             <input type="text" id="pw" placeholder="GG.AA.YYYY">
             <br>
             <button onclick="openSite()" style="background: var(--primary); color: white; border: none; padding: 15px 40px; border-radius: 50px; cursor: pointer; font-weight: bold; transition: 0.3s;">Aç Bakalım bitaneemmmm ✨</button>
+            <button onclick="startMusic()" style="margin-top:10px; background:#fff; color:black; padding:10px 20px; border-radius:20px;">
+    Müziği Başlat 🎵
+</button>
         </div>
     </div>
 
@@ -187,7 +190,12 @@
         <source src="UZI - MA CHÉRIE feat. AKSAN (Lyrics).mp3" type="audio/mpeg">
     </audio>
 
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js">
+        function startMusic() {
+    const music = document.getElementById('music');
+    music.play();
+}
+    </script>
     <script>
         AOS.init({ duration: 1200 });
 
